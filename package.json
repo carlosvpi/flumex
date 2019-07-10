@@ -1,0 +1,22 @@
+{
+  "name": "flumex",
+  "version": "0.0.0",
+  "description": "Utility library for observables",
+  "main": "index.js",
+  "scripts": {
+    "test": "yarn test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/carlosvpi/flumex.git"
+  },
+  "keywords": [
+    "observable"
+  ],
+  "author": "Carlos Vazquez Perez-Inigo",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/carlosvpi/flumex/issues"
+  },
+  "homepage": "https://github.com/carlosvpi/flumex#readme"
+}
