@@ -1,17 +1,17 @@
 const noop = () => {}
 
-function Flumex (generator, cancel = noop) {
-    this.value
+function Flumex (generator, cancel = noop, defaultValue) {
+    this.value = defaultValue
     this.done = false
     this.closing = false
     this.subscriptions = []
-    const set = (value) => {
+    this.set = (value) => {
         if (this.done) {
             return
         }
         if (this.closing) {
             this.done = true
-            cancel(set)
+            cancel(this.set)
             this.closing = false
         }
         this.value = value
@@ -20,9 +20,15 @@ function Flumex (generator, cancel = noop) {
         })
         this.subscriptions = []
     }
-    generator(set, () => this.closing = true)
+    this.cancel = cancel.bind(this, this.set)
+    generator(this.set, () => this.closing = true)
 }
 
+Flumex.prototype.add = function (flumex) {
+    flumex.forEach(({ value }) => {
+        this.set(value)
+    })
+}
 Flumex.prototype.next = function () {
     return new Promise((resolve) => {
         if (!this.subscriptions.includes(resolve)) {
@@ -35,14 +41,25 @@ Flumex.prototype.close = function (value) {
     this.closing = true
 }
 
+Flumex.prototype.default = function (value) {
+    this.value = value
+    return this
+}
 Flumex.prototype.forEach = function (f) {
     return Flumex.forEach(f)(this)
 }
-Flumex.forEach = (f) => async (flumex) => {
-    while (await flumex.next() && !flumex.done) {
-        f(flumex)
+Flumex.forEach = (f) => (flumex) => {
+    let proceed = true
+    const next = () => {
+        flumex.next().then(() => {
+            if (proceed) {
+                f(flumex)
+                next()
+            }
+        })
     }
-    f(flumex)
+    next()
+    return () => proceed = false
 }
 
 Flumex.prototype.map = function (f) {
@@ -57,7 +74,7 @@ Flumex.map = (f) => (flumex) => {
                 set(f(value))
             }
         })
-    })
+    }, () => flumex.cancel())
 }
 
 Flumex.prototype.filter = function (p) {
@@ -126,8 +143,8 @@ Flumex.prototype.reduce = function (f, init) {
     return Flumex.reduce(f, init)(this)
 }
 Flumex.reduce = (f, init) => (flumex) => {
-    return new Flumex((set, close) => {
-        let acc
+    const reduction = new Flumex((set, close) => {
+        let acc = init
         flumex.forEach(({ value, done }) => {
             acc = f(acc, value)
             if (done) {
@@ -137,6 +154,8 @@ Flumex.reduce = (f, init) => (flumex) => {
             }
         })
     })
+    reduction.value = init
+    return reduction
 }
 Flumex.prototype.mergeRace = function (...flumexes) {
     return Flumex.mergeRace(this, ...flumexes)
@@ -169,7 +188,9 @@ Flumex.mergeAll = (...flumexes) => {
                 }
             })
         })
-    })
+    }, () => {
+        flumexes.forEach((flumex) => flumex.cancel())
+    }, flumexes[0].value)
 }
 
 Flumex.every = (...flumexes) => {
@@ -204,6 +225,27 @@ Flumex.some = (...flumexes) => {
     })
 }
 
+// Flumex.combineAll = (collection) => {
+// }
+Flumex.combineRace = (collection) => {
+    const flumexes = Array.isArray(collection)
+        ? collection.filter(item => item.constructor === Flumex)
+        : Object.keys(collection)
+            .map((key) => collection[key])
+            .filter(item => item.constructor === Flumex)
+    return new Flumex((set, close) => {
+        flumexes.forEach((item) => {
+            item.forEach(() => {
+                if (item.done) {
+                    close(collection)
+                } else {
+                    set(collection)
+                }
+            })
+        })
+    }, () => flumexes.forEach((item) => item.cancel()), collection)
+}
+
 Flumex.fromInterval = (interval, cleanAfter = 10000) => {
     let i = 0
     let token
@@ -216,7 +258,7 @@ Flumex.fromInterval = (interval, cleanAfter = 10000) => {
     return s
 }
 
-Flumex.fromFunction = (f) => {
+Flumex.fromSetter = (f) => {
     let setFlumex, closeFlumex
     const flumex = new Flumex((set, close) => {
         setFlumex = set
@@ -233,10 +275,14 @@ Flumex.fromEvent = (node, eventName, useCapture) => {
     })
 }
 
-Flumex.fromFetch = (url) => {
+Flumex.fromFetch = (url, options) => {
     let fetcher
     const flumex = new Flumex((set) => {
-        fetcher = async (options) => {
+        fetcher = async (newOptions) => {
+            options = {
+                ...options,
+                newOptions
+            }
             set(await fetch(url, options))
         }
     })
@@ -267,6 +313,6 @@ g = async (flumex) => {
     console.log('Party has finished!! :(')
 }
 
-s = Flumex.fromInterval(1000).map(x => x * 2)
-f(s)
-g(s)
+// s = Flumex.fromInterval(1000).map(x => x * 2)
+// f(s)
+// g(s)
