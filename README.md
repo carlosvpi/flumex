@@ -7,7 +7,7 @@ Utility library for observables
 
 ```new Flumex(set: T -> Nil, close: T -> Nil): Flumex T```
 
-```type Next T = {value: T, done: Bool}
+```type Next T = {value: T, done: Bool}```
 
 ## Methods
 
