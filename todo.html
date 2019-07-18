@@ -1,0 +1,105 @@
+<html>
+<head>
+	<script src='index.js'></script>
+</head>
+<body>
+	<div>
+		<h4>Add a todo</h4>
+		<input id='todoInput'></input>
+		<br />
+		<button id='addTodoBtn'>Add</button> (or press Enter)
+	</div>
+	<hr />
+	<div>
+		<h4>Filter todos</h4>
+		<label for='filterAllInput'>
+			<input type='radio' checked name='filterInput' id='filterAllInput' value='all'></Input>
+			All
+		</label>
+		<label for='filterDoneInput'>
+			<input type='radio' name='filterInput' id='filterDoneInput' value='done'></Input>
+			Done
+		</label>
+		<label for='filterTodoInput'>
+			<input type='radio' name='filterInput' id='filterTodoInput' value='todo'></Input>
+			To do
+		</label>
+	</div>
+	<hr />
+	<div>
+		<h4><span id='todoCount'></span> todos</h4>
+		<ul id='todoList'>
+		</ul>
+	</div>
+
+	<script>
+		const todoList = document.getElementById('todoList')
+		const todoInput = document.getElementById('todoInput')
+		const addTodoBtn = document.getElementById('addTodoBtn')
+		const filterAllInput = document.getElementById('filterAllInput')
+		const filterDoneInput = document.getElementById('filterDoneInput')
+		const filterTodoInput = document.getElementById('filterTodoInput')
+		const todoCount = document.getElementById('todoCount')
+
+		const newTodoTextFlx = Flumex.mergeAll(
+				Flumex.fromEvent(todoInput, 'keypress').filter(({ key }) => key === 'Enter'),
+				Flumex.fromEvent(addTodoBtn, 'click')
+			).map(() => todoInput.value)
+			.filter((value) => value !== '')
+		newTodoTextFlx.forEach(() => todoInput.value = '')
+		const filterFlx = Flumex.mergeAll(
+			Flumex.fromEvent(filterAllInput, 'change'),
+			Flumex.fromEvent(filterDoneInput, 'change'),
+			Flumex.fromEvent(filterTodoInput, 'change')
+		).map(({ target }) => target.value).default('all')
+		const todosFlx = newTodoTextFlx.reduce((todos, todoText) => {
+			statusFlx = new Flumex(() => {}, () => {}, 'todo')
+			statusFlx.forEach(() => todosFlx.set(todosFlx.value))
+			return todos.concat(Flumex.combineRace({
+				text: todoText,
+				date: Date.now(),
+				statusFlx
+			}))
+		}, [])
+		const stateFlx = Flumex.combineRace({
+			todosFlx,
+			filterFlx
+		})
+		const countTodosFlx = stateFlx.map(({ todosFlx }) => {
+			return todosFlx.value.filter(({ value }) => value.statusFlx.value === 'todo').length
+		})
+		const visibleTodosFlx = stateFlx.map(({ filterFlx, todosFlx }) => {
+			if (filterFlx.value === 'all') {
+				return todosFlx.value
+			} else {
+				return todosFlx.value.filter(({ value }) => value.statusFlx.value === filterFlx.value)
+			}
+		})
+		const visibleTodosNodesFlx = visibleTodosFlx.map((visibleTodos) => {
+			todoList.innerHTML = ''
+			visibleTodos.forEach(({ value }) => {
+				const { text, date, statusFlx } = value
+				const node = document.createElement('LI')
+				node.innerHTML = `<label for='todo-${ date }'>
+						<Input type='checkbox' id='todo-${ date }'></Input>
+						${ text }
+					</label>`
+				todoList.appendChild(node)
+				const todoStatusChk = document.getElementById(`todo-${ date }`)
+				if (statusFlx.value === 'done') {
+					todoStatusChk.checked = true
+				}
+				const _statusFlx = Flumex
+					.fromEvent(todoStatusChk, 'change')
+					.map(({ target }) => target.checked ? 'done' : 'todo')
+				statusFlx.add(_statusFlx)
+			})
+		})
+		visibleTodosFlx.forEach(({ value }) => console.log(value))
+		countTodosFlx.forEach(({ value }) => {
+			todoCount.innerHTML = value
+		})
+		countTodosFlx.set(0)
+	</script>
+</body>
+</html>

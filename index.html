@@ -1,0 +1,32 @@
+<html>
+<head>
+	<script src='index.js'></script>
+</head>
+<body>
+	<span id='counterSpan'></span>
+	<br />
+	<button id='addBtn'>Add</button>
+	<br />
+	<button id='stopBtn'>Stop timer</button>
+	<script>
+		const counterSpan = document.getElementById('counterSpan')
+		const addBtn = document.getElementById('addBtn')
+		const stopBtn = document.getElementById('stopBtn')
+		const intervalFlx = Flumex.fromInterval(1000, 0).map(() => 1)
+		const eventCounterFlx = Flumex.fromEvent(addBtn, 'click').map(() => 1)
+		stopBtn.onclick = () => {
+			intervalFlx.close()
+		}
+		Flumex.mergeAll(intervalFlx, eventCounterFlx)
+			.reduce((a, b) => a + b, 0)
+			.forEach(({ value, done }) => {
+				if (done) {
+					counterSpan.innerText = 'Finished'
+					intervalFlx.close()
+				} else {
+					counterSpan.innerText = value
+				}
+			})
+	</script>
+</body>
+</html>
